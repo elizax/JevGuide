@@ -1,4 +1,4 @@
-﻿package io.github.nisaka520.jevguide
+package io.github.nisaka520.jevguide
 
 import android.content.Context
 
@@ -15,6 +15,11 @@ class Config(ctx: Context) {
     var apiKey: String
         get() = KeyVault.decrypt(sp.getString("api_key", "").orEmpty())
         set(v) = sp.edit().putString("api_key", KeyVault.encrypt(v.trim())).apply()
+
+    /** Jev 接口地址（判读/攻略度）。默认官方端点，设置页可改成 OpenRouter 或自建中转。 */
+    var jevBaseUrl: String
+        get() = sp.getString("jev_base_url", JevHttp.DEFAULT_ENDPOINT).orEmpty().ifEmpty { JevHttp.DEFAULT_ENDPOINT }
+        set(v) = sp.edit().putString("jev_base_url", v.trim()).apply()
 
     var model: String
         get() = sp.getString("model", Prompt.MODELS[0]).orEmpty().ifEmpty { Prompt.MODELS[0] }

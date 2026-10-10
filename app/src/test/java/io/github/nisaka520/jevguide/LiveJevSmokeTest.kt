@@ -10,8 +10,8 @@ import org.junit.Test
  * 构造 7 题请求 → 真接口 → 解析答案 → 3 条提示」整条链走通。
  *
  * 默认**跳过**（不设密钥就不会偷偷发请求）；要跑就：
- *   PowerShell:  $env:JEV_KEY='apikey_…';  ./gradlew testDebugUnitTest --tests '*LiveJevSmokeTest*'
- *   bash:        JEV_KEY=apikey_… ./gradlew testDebugUnitTest --tests '*LiveJevSmokeTest*'
+ *   PowerShell:  $env:JEV_KEY='apikey_…'; $env:JEV_URL='https://…'; $env:JEV_MODEL='…';  ./gradlew testDebugUnitTest --tests '*LiveJevSmokeTest*'
+ *   bash:        JEV_KEY=apikey_… JEV_URL=https://… JEV_MODEL=… ./gradlew testDebugUnitTest --tests '*LiveJevSmokeTest*'
  */
 class LiveJevSmokeTest {
 
@@ -34,8 +34,10 @@ class LiveJevSmokeTest {
         val state = digest.state(contact, maxCtx = 3)
         assertTrue("state 不该为空", state.isNotEmpty())
 
-        val body = Prompt.requestJson(state, Prompt.MODELS[0], "zh")
-        val result = JevHttp.analyze(key, body, timeoutMs = 40000)
+        val model = System.getenv("JEV_MODEL").ifEmpty { Prompt.MODELS[0] }
+        val url = System.getenv("JEV_URL").ifEmpty { JevHttp.DEFAULT_ENDPOINT }
+        val body = Prompt.requestJson(state, model, "zh")
+        val result = JevHttp.analyze(key, body, baseUrl = url, timeoutMs = 40000)
 
         when (result) {
             is JevResult.Err -> throw AssertionError("真接口调用失败：" + result.message)

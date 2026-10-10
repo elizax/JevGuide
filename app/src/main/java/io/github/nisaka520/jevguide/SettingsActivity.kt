@@ -1,4 +1,4 @@
-﻿package io.github.nisaka520.jevguide
+package io.github.nisaka520.jevguide
 
 import android.Manifest
 import android.content.Intent
@@ -170,29 +170,43 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        // 密钥
+        // Jev（判读 / 攻略度）
         section("三方模型（调 Jev 算攻略度）", "key", 0xFF6FD3C7.toInt())
-        sub("填自己的 TypeSafe/Jev 密钥（apikey_… 开头，约 100 字符）。没有的话：console.typesafe.ai 用 Google 或邮箱验证码登录 → API Keys → 新建，复制过来贴上。")
+        sub(
+            "填自己的 TypeSafe/Jev 密钥（apikey_… 开头，约 100 字符）。没有的话：console.typesafe.ai 用 Google 或邮箱验证码登录 → API Keys → 新建，复制过来贴上。\n" +
+                "接口地址和模型名默认走官方，一般不用改；想换 OpenRouter 或自建中转，就在这里填。"
+        )
         val key = edit(cfg.apiKey, "apikey_…（只存在本机）", password = true)
-        button("保存密钥", filled = true) {
+        val jevBase = edit(cfg.jevBaseUrl, "Jev 接口地址（默认 https://api.typesafe.ai/v1/systemone）")
+        val jevModel = edit(cfg.model, "Jev 模型名（默认 jev-latest）")
+        button("保存 Jev 配置", filled = true) {
             cfg.apiKey = key.text.toString().trim()
-            toast(if (cfg.hasKey()) "已保存（${cfg.apiKey.length} 字符）" else "太短了，密钥一般 100 字符左右")
+            cfg.jevBaseUrl = jevBase.text.toString().trim()
+            cfg.model = jevModel.text.toString().trim()
+            toast(
+                if (cfg.hasKey()) "已保存：${cfg.model} @ ${cfg.jevBaseUrl}"
+                else "太短了，密钥一般 100 字符左右（地址与模型已保存）"
+            )
             refreshDynamic()
         }
         button("测试密钥", filled = true) {
             val k = key.text.toString().trim()
+            val base = jevBase.text.toString().trim()
+            val m = jevModel.text.toString().trim()
             if (k.length < 20) {
                 toast("先填密钥")
                 return@button
             }
             cfg.apiKey = k
+            cfg.jevBaseUrl = base
+            cfg.model = m
             toast("正在测试…")
             Thread {
-                val r = JevHttp.test(k)
+                val r = JevHttp.test(k, base, m)
                 runOnUiThread {
                     when (r) {
                         is JevResult.Ok -> {
-                            AppLog.add("密钥测试成功")
+                            AppLog.add("密钥测试成功（$m @ $base）")
                             toast("密钥可用 ✓")
                         }
                         is JevResult.Err -> {
@@ -232,9 +246,6 @@ class SettingsActivity : AppCompatActivity() {
         spinner("题目语言", Prompt.LANG_LABELS, Prompt.LANGS.indexOf(cfg.lang).coerceAtLeast(0)) {
             cfg.lang = Prompt.LANGS[it]
             toast("题目语言 → " + cfg.lang)
-        }
-        spinner("模型", Prompt.MODELS, Prompt.MODELS.indexOf(cfg.model).coerceAtLeast(0)) {
-            cfg.model = Prompt.MODELS[it]
         }
         spinner("情绪显示条数", listOf("1 条", "3 条", "5 条"), listOf(1, 3, 5).indexOf(cfg.emotionTop).coerceAtLeast(0)) {
             cfg.emotionTop = listOf(1, 3, 5)[it]
@@ -670,6 +681,7 @@ class SettingsActivity : AppCompatActivity() {
         statusText.text = buildString {
             append("无障碍服务：").append(if (on) "已开启 ✓" else "未开启 ✗（上面那个按钮去开）").append('\n')
             append("Jev 密钥：").append(if (cfg.hasKey()) "已配置（${cfg.apiKey.length} 字符）" else "未配置").append('\n')
+            append("Jev 端点：").append(cfg.jevBaseUrl).append(" · 模型 ").append(cfg.model).append('\n')
             append("聊天模型：").append(
                 if (cfg.hasChatKey()) "${cfg.chatModel}（${cfg.chatBaseUrl}）"
                 else "未配置（只能判读，不出文案）"

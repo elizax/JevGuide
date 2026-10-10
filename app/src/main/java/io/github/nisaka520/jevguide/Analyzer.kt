@@ -1,4 +1,4 @@
-﻿package io.github.nisaka520.jevguide
+package io.github.nisaka520.jevguide
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -85,7 +85,7 @@ object Analyzer {
         pool.execute(guarded(ctx) {
             val t0 = System.currentTimeMillis()
             val body = Prompt.requestJson(state, cfg.model, cfg.lang, cfg.guideEnabled)
-            val result = JevHttp.analyze(cfg.apiKey, body)
+            val result = JevHttp.analyze(cfg.apiKey, body, cfg.jevBaseUrl)
             val jevCost = System.currentTimeMillis() - t0
 
             when (result) {

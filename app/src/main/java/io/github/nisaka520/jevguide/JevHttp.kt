@@ -1,9 +1,8 @@
-﻿package io.github.nisaka520.jevguide
+package io.github.nisaka520.jevguide
 
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 
 /** 调 Jev 的结果：要么拿到响应体，要么带一句人话的错误 */
 sealed class JevResult {
@@ -12,20 +11,33 @@ sealed class JevResult {
 }
 
 /**
- * 唯一的网络出口：POST https://api.typesafe.ai/v1/systemone
+ * 调 Jev（判读 / 攻略度）的网络出口。
+ *
+ * 地址默认是官方端点 https://api.typesafe.ai/v1/systemone，但**可以在设置页改成任何
+ * 兼容端点**（比如 OpenRouter 的 https://openrouter.ai/api/alpha/decisions 或自建中转），
+ * 模型名同理可配 —— 这样换地址/模型就不用改源码重打包。
  *
  * 用 HttpURLConnection 而不是 OkHttp/Retrofit —— 整包运行期零第三方依赖，
  * 无障碍服务这种常驻进程里少带一个库就少一份自己控制不了的东西。
  */
 object JevHttp {
 
-    const val ENDPOINT = "https://api.typesafe.ai/v1/systemone"
+    /** 默认 Jev 接口地址；设置页可覆盖。 */
+    const val DEFAULT_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 
-    fun analyze(apiKey: String, requestBody: String, timeoutMs: Int = 25000): JevResult =
-        post(apiKey, requestBody, timeoutMs)
+    fun analyze(
+        apiKey: String,
+        requestBody: String,
+        baseUrl: String = DEFAULT_ENDPOINT,
+        timeoutMs: Int = 25000
+    ): JevResult = post(apiKey, requestBody, baseUrl, timeoutMs)
 
     /** 设置页"测试密钥"用：一条极小的请求，只验证密钥与连通性 */
-    fun test(apiKey: String): JevResult {
+    fun test(
+        apiKey: String,
+        baseUrl: String = DEFAULT_ENDPOINT,
+        model: String = Prompt.MODELS[0]
+    ): JevResult {
         val state = Json.write(
             mapOf(
                 "关系" to "普通朋友",
@@ -35,14 +47,14 @@ object JevHttp {
                 "待分析消息" to "在吗？"
             )
         )
-        val body = Prompt.requestJson(state, Prompt.MODELS[0], "zh")
-        return post(apiKey, body, 20000)
+        val body = Prompt.requestJson(state, model, "zh")
+        return post(apiKey, body, baseUrl, 20000)
     }
 
-    private fun post(apiKey: String, body: String, timeoutMs: Int): JevResult {
+    private fun post(apiKey: String, body: String, baseUrl: String, timeoutMs: Int): JevResult {
         var conn: HttpURLConnection? = null
         return try {
-            conn = (URL(ENDPOINT).openConnection() as HttpsURLConnection).apply {
+            conn = (URL(baseUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = timeoutMs
                 readTimeout = timeoutMs
@@ -78,8 +90,8 @@ object JevHttp {
     private fun explain(code: Int, body: String): String {
         val brief = body.replace(Regex("""\s+"""), " ").take(160)
         return when (code) {
-            401, 403 -> "密钥无效或被撤销（HTTP $code）—— 去 console.typesafe.ai/api-keys 确认"
-            404 -> "接口地址 404，检查是不是官方端点变了"
+            401, 403 -> "密钥无效或被撤销（HTTP $code）—— 确认密钥正确、且属于当前填的地址"
+            404 -> "接口地址 404，检查地址和模型名是不是填对了"
             429 -> "被限流了（HTTP 429），等一会儿再试"
             in 500..599 -> "接口服务端错误 HTTP $code"
             else -> "HTTP $code" + if (brief.isEmpty()) "" else "：$brief"
